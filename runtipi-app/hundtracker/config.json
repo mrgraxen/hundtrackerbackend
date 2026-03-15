@@ -1,0 +1,75 @@
+{
+  "id": "hundtracker",
+  "name": "Hundtracker Backend",
+  "short_desc": "Backend API for hunter tracker app: hunt teams, dog positions (MQTT), chat.",
+  "description": "Hundtracker provides a REST API and WebSocket for a hunter tracker app. Hunters create teams, connect dogs (ESP32/MQTT), start hunts, share positions on a map, and use team chat. Requires MQTT broker and JWT secret.",
+  "tipi_version": 1,
+  "version": "0.1.0",
+  "available": true,
+  "port": 8754,
+  "exposable": true,
+  "dynamic_config": true,
+  "min_tipi_version": "4.0.0",
+  "categories": ["utilities", "network"],
+  "author": "Hundtracker",
+  "source": "https://github.com/runtipi/runtipi-appstore",
+  "website": "https://github.com",
+  "supported_architectures": ["arm64", "amd64"],
+  "form_fields": [
+    {
+      "type": "text",
+      "label": "Docker image (GHCR)",
+      "hint": "Full image URL, e.g. ghcr.io/YOUR_USERNAME/hundtracker-backend:latest",
+      "required": true,
+      "env_variable": "HUNDTRACKER_IMAGE",
+      "default": "ghcr.io/graxe/hundtracker-backend:latest"
+    },
+    {
+      "type": "random",
+      "label": "Database password",
+      "hint": "PostgreSQL password for the app database.",
+      "required": true,
+      "env_variable": "HUNDTRACKER_DB_PASSWORD",
+      "min": 16
+    },
+    {
+      "type": "random",
+      "label": "JWT secret",
+      "hint": "Used to sign auth tokens; keep secret.",
+      "required": true,
+      "env_variable": "JWT_SECRET",
+      "min": 32
+    },
+    {
+      "type": "password",
+      "label": "MQTT password",
+      "hint": "Password for the MQTT broker (see your mqtt settings).",
+      "required": true,
+      "env_variable": "MQTT_PASSWORD"
+    },
+    {
+      "type": "text",
+      "label": "MQTT host",
+      "hint": "Broker hostname.",
+      "required": false,
+      "env_variable": "MQTT_HOST",
+      "default": "mqtt.chickendinner.vip"
+    },
+    {
+      "type": "number",
+      "label": "MQTT port",
+      "required": false,
+      "env_variable": "MQTT_PORT",
+      "default": 8883
+    },
+    {
+      "type": "text",
+      "label": "MQTT username",
+      "required": false,
+      "env_variable": "MQTT_USERNAME",
+      "default": "trackerbackend"
+    }
+  ],
+  "created_at": 1730000000000,
+  "updated_at": 1730000000000
+}

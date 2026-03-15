@@ -1,0 +1,40 @@
+# Hundtracker Backend - Docker Compose
+# Run: docker-compose up -d
+# API: http://localhost:8000
+# Docs: http://localhost:8000/docs
+
+services:
+  backend:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://tracker:tracker@db:5432/hundtracker
+      - MQTT_HOST=${MQTT_HOST:-mqtt.chickendinner.vip}
+      - MQTT_PORT=${MQTT_PORT:-8883}
+      - MQTT_USERNAME=${MQTT_USERNAME:-trackerbackend}
+      - MQTT_PASSWORD=${MQTT_PASSWORD}
+      - JWT_SECRET=${JWT_SECRET}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    volumes:
+      - ./app:/app/app  # Dev hot-reload (comment out for prod)
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: tracker
+      POSTGRES_PASSWORD: tracker
+      POSTGRES_DB: hundtracker
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tracker"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:

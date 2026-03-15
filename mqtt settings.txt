@@ -1,0 +1,4 @@
+Host: mqtt.chickendinner.vip
+Port: 8883
+login: trackerbackend
+password: x6w8rgaT2

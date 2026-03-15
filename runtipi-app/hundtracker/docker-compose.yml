@@ -1,0 +1,41 @@
+# RunTipi app: Hundtracker Backend
+# Image from GHCR - set HUNDTRACKER_IMAGE in app config (e.g. ghcr.io/YOUR_USERNAME/hundtracker-backend:latest)
+services:
+  hundtracker:
+    image: ${HUNDTRACKER_IMAGE}
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://tracker:${HUNDTRACKER_DB_PASSWORD}@hundtracker-db:5432/hundtracker
+      - MQTT_HOST=${MQTT_HOST}
+      - MQTT_PORT=${MQTT_PORT}
+      - MQTT_USERNAME=${MQTT_USERNAME}
+      - MQTT_PASSWORD=${MQTT_PASSWORD}
+      - JWT_SECRET=${JWT_SECRET}
+    depends_on:
+      hundtracker-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    x-runtipi:
+      is_main: true
+      internal_port: 8000
+
+  hundtracker-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: tracker
+      POSTGRES_PASSWORD: ${HUNDTRACKER_DB_PASSWORD}
+      POSTGRES_DB: hundtracker
+    volumes:
+      - ${APP_DATA_DIR}/db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tracker"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+x-runtipi:
+  schema_version: 2

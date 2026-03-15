@@ -1,0 +1,11 @@
+Topics:
+/position/in/$clientid
+so for example ClientID: dog1 will send information on
+/position/in/dog1
+
+Example data:
+When esp32 has gpsfix example:
+{"client":"dog01","lat":59.329323,"lon":18.068581,"speed":0.0,"alt":12,"vsat":8,"accuracy":3.5,"time":"2025-03-01T15:22:10"}
+
+When esp32 lacks gpsfix example:
+{"client":"dog01","fix":false,"nogps":true}
