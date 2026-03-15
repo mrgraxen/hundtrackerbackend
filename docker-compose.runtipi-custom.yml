@@ -1,0 +1,35 @@
+# Paste this into RunTipi "Create custom app". Postgres is included; password is set below.
+# Only add in RunTipi env vars: MQTT_PASSWORD (from your mqtt settings.txt).
+# Optionally set JWT_SECRET if you want a custom one (default is fine for testing).
+
+services:
+  hundtracker-backend:
+    image: ghcr.io/mrgraxen/hundtracker-backend:latest
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://tracker:tracker@hundtracker-db:5432/hundtracker
+      - MQTT_HOST=mqtt.chickendinner.vip
+      - MQTT_PORT=8883
+      - MQTT_USERNAME=trackerbackend
+      - MQTT_PASSWORD=${MQTT_PASSWORD}
+      - JWT_SECRET=${JWT_SECRET:-change-me-use-env-in-production}
+    depends_on:
+      hundtracker-db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  hundtracker-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: tracker
+      POSTGRES_PASSWORD: tracker
+      POSTGRES_DB: hundtracker
+    volumes:
+      - hundtracker_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tracker"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  hundtracker_db_data:

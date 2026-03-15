@@ -135,21 +135,20 @@ async def run_mqtt_listener(
                 await client.subscribe(topic)
                 logger.info("MQTT subscribed to %s", topic)
 
-                async with client.messages() as messages:
-                    async for message in messages:
-                        try:
-                            if not message.topic.matches(f"{POSITION_TOPIC_PREFIX}+"):
-                                continue
-                            topic_str = str(getattr(message.topic, "value", message.topic))
-                            client_id = topic_str.rstrip("/").split("/")[-1]
-                            payload = json.loads(message.payload.decode())
-                            await _process_dog_position(client_id, payload)
-                            if on_position:
-                                on_position(client_id, payload)
-                        except json.JSONDecodeError as e:
-                            logger.warning("Invalid JSON from %s: %s", message.topic, e)
-                        except Exception as e:
-                            logger.exception("Error processing position: %s", e)
+                async for message in client.messages:
+                    try:
+                        if not message.topic.matches(f"{POSITION_TOPIC_PREFIX}+"):
+                            continue
+                        topic_str = str(getattr(message.topic, "value", message.topic))
+                        client_id = topic_str.rstrip("/").split("/")[-1]
+                        payload = json.loads(message.payload.decode())
+                        await _process_dog_position(client_id, payload)
+                        if on_position:
+                            on_position(client_id, payload)
+                    except json.JSONDecodeError as e:
+                        logger.warning("Invalid JSON from %s: %s", message.topic, e)
+                    except Exception as e:
+                        logger.exception("Error processing position: %s", e)
         except asyncio.CancelledError:
             logger.info("MQTT listener cancelled")
             break
