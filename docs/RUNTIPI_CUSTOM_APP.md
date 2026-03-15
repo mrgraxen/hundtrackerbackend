@@ -13,7 +13,7 @@ In the repo there is **`docker-compose.runtipi-custom.yml`** which already inclu
 
 1. Open `docker-compose.runtipi-custom.yml` in the repo (or copy it from below).
 2. In RunTipi → **Create custom app** → paste the full contents of that file.
-3. In RunTipi, add **one environment variable** for the backend service: **`MQTT_PASSWORD`** = (the password from your `mqtt settings.txt`).
+3. In RunTipi, add **one environment variable** for the backend service: **`MQTT_PASSWORD`** = (the password from your `mqtt settings.env`).
 4. (Optional) Add **`JWT_SECRET`** if you want your own secret; otherwise the compose uses a default for testing.
 5. Save and start the app.
 

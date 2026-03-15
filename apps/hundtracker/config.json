@@ -43,7 +43,7 @@
     {
       "type": "password",
       "label": "MQTT password",
-      "hint": "Password for the MQTT broker (see your mqtt settings).",
+      "hint": "Password for the MQTT broker (see your mqtt settings.env).",
       "required": true,
       "env_variable": "MQTT_PASSWORD"
     },

@@ -1,5 +1,5 @@
 # Paste this into RunTipi "Create custom app". Postgres is included; password is set below.
-# Only add in RunTipi env vars: MQTT_PASSWORD (from your mqtt settings.txt).
+# Only add in RunTipi env vars: MQTT_PASSWORD (from your mqtt settings.env).
 # Optionally set JWT_SECRET if you want a custom one (default is fine for testing).
 
 services:

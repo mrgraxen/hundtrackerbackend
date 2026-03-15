@@ -23,12 +23,12 @@ Backend for a hunter tracker app: hunt teams, dog positions (ESP32/MQTT), hunter
 ## Requirements
 
 - Docker & Docker Compose (or Python 3.11+ for local development)
-- MQTT broker access (see `mqtt settings.txt`)
+- MQTT broker access (see `mqtt settings.env` – not in repo, keep local)
 
 ## Quick Start
 
 1. Copy `.env.example` to `.env` and set:
-   - `MQTT_PASSWORD` (from `mqtt settings.txt`)
+   - `MQTT_PASSWORD` (from your `mqtt settings.env`)
    - `JWT_SECRET` (e.g. `openssl rand -hex 32`)
 
 2. Run with Docker Compose:
