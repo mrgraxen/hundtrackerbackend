@@ -138,7 +138,8 @@ async def get_hunt_team(
         HuntTeamMemberResponse(
             user_id=m.user_id,
             display_name=dn or m.user.email,
-            role=m.role.value,
+            # m.role is now stored as a plain string in the DB
+            role=getattr(m.role, "value", m.role),
             joined_at=m.joined_at,
         )
         for m, dn in result.all()
