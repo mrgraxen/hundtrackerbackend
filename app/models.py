@@ -97,7 +97,7 @@ class HuntTeamMember(Base):
         primary_key=True,
     )
     role: Mapped[MemberRole] = mapped_column(
-        default=MemberRole.MEMBER, nullable=False
+        String(20), default=MemberRole.MEMBER, nullable=False
     )
     joined_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
@@ -160,7 +160,7 @@ class Hunt(Base):
     started_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     ended_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     status: Mapped[HuntStatus] = mapped_column(
-        default=HuntStatus.ACTIVE, nullable=False
+        String(20), default=HuntStatus.ACTIVE, nullable=False
     )
 
     hunt_team: Mapped["HuntTeam"] = relationship(
@@ -197,7 +197,7 @@ class Position(Base):
     __tablename__ = "positions"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    source_type: Mapped[SourceType] = mapped_column(nullable=False)
+    source_type: Mapped[SourceType] = mapped_column(String(20), nullable=False)
     source_id: Mapped[str] = mapped_column(
         String(64), nullable=False
     )  # dog client_id or str(user_id)
