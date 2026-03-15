@@ -27,7 +27,7 @@ services:
     environment:
       POSTGRES_USER: tracker
       POSTGRES_PASSWORD: tracker
-      POSTGRES_DB: tracker
+      # No POSTGRES_DB: default DB name = POSTGRES_USER (= tracker)
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:

@@ -28,7 +28,7 @@ services:
     environment:
       POSTGRES_USER: tracker
       POSTGRES_PASSWORD: ${HUNDTRACKER_DB_PASSWORD}
-      POSTGRES_DB: tracker
+      # POSTGRES_DB omitted: image default is to create DB named like POSTGRES_USER (= tracker)
     volumes:
       - ${APP_DATA_DIR}/db:/var/lib/postgresql/data
     healthcheck:
