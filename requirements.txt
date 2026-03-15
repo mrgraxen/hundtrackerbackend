@@ -19,6 +19,7 @@ paho-mqtt==2.1.0
 # Config & validation
 pydantic==2.10.2
 pydantic-settings==2.6.1
+email-validator>=2.0.0
 
 # WebSocket & async
 python-multipart==0.0.17
