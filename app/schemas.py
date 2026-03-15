@@ -1,19 +1,19 @@
 """Pydantic schemas for API request/response."""
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, constr
 
 
 # ----- Auth -----
 class UserRegister(BaseModel):
     email: EmailStr
-    password: str
+    password: constr(min_length=8, max_length=72)
     display_name: Optional[str] = None
 
 
 class UserLogin(BaseModel):
     email: EmailStr
-    password: str
+    password: constr(min_length=8, max_length=72)
 
 
 class Token(BaseModel):

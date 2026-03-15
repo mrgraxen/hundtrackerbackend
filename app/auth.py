@@ -18,6 +18,12 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def hash_password(password: str) -> str:
+    # Defensive check: bcrypt only supports passwords up to 72 bytes.
+    if len(password.encode("utf-8")) > 72:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password too long (max 72 characters due to bcrypt).",
+        )
     return pwd_context.hash(password)
 
 

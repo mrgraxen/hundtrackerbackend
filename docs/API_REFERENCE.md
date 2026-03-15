@@ -18,7 +18,7 @@ Create hunter profile.
 ```json
 {
   "email": "hunter@example.com",
-  "password": "secret",
+  "password": "secret-password", // 8-72 characters
   "display_name": "John Doe"
 }
 ```

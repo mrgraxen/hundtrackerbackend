@@ -51,7 +51,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Hundtracker Backend",
     description="Backend for hunter tracker app - hunt teams, dogs, positions, chat",
-    version="0.1.0",
+    version="0.1.1",
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",

@@ -4,7 +4,7 @@
   "short_desc": "Backend API for hunter tracker app: hunt teams, dog positions (MQTT), chat.",
   "description": "Hundtracker provides a REST API and WebSocket for a hunter tracker app. Hunters create teams, connect dogs (ESP32/MQTT), start hunts, share positions on a map, and use team chat. Requires MQTT broker and JWT secret.",
   "tipi_version": 1,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "available": true,
   "port": 8754,
   "exposable": true,
