@@ -22,7 +22,7 @@
       "hint": "Full image URL, e.g. ghcr.io/YOUR_USERNAME/hundtracker-backend:latest",
       "required": true,
       "env_variable": "HUNDTRACKER_IMAGE",
-      "default": "ghcr.io/graxe/hundtracker-backend:latest"
+      "default": "ghcr.io/mrgraxen/hundtracker-backend:latest"
     },
     {
       "type": "random",

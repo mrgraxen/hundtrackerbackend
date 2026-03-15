@@ -2,6 +2,8 @@
 
 Backend for a hunter tracker app: hunt teams, dog positions (ESP32/MQTT), hunter positions (app/web), and chat.
 
+**New to GitHub or CI/CD?** See [docs/GITHUB_SETUP.md](docs/GITHUB_SETUP.md) for step-by-step setup and pushing this repo.
+
 ## Features
 
 - **Hunter profiles** – Register, login (JWT)
