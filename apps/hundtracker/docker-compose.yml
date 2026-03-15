@@ -4,7 +4,7 @@ services:
   hundtracker:
     image: ${HUNDTRACKER_IMAGE}
     environment:
-      - DATABASE_URL=postgresql+asyncpg://tracker:${HUNDTRACKER_DB_PASSWORD}@hundtracker-db:5432/hundtracker
+      - DATABASE_URL=postgresql+asyncpg://tracker:${HUNDTRACKER_DB_PASSWORD}@hundtracker-db:5432/tracker
       - MQTT_HOST=${MQTT_HOST}
       - MQTT_PORT=${MQTT_PORT}
       - MQTT_USERNAME=${MQTT_USERNAME}
@@ -28,7 +28,7 @@ services:
     environment:
       POSTGRES_USER: tracker
       POSTGRES_PASSWORD: ${HUNDTRACKER_DB_PASSWORD}
-      POSTGRES_DB: hundtracker
+      POSTGRES_DB: tracker
     volumes:
       - ${APP_DATA_DIR}/db:/var/lib/postgresql/data
     healthcheck:

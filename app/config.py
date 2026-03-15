@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     """Backend settings loaded from environment."""
 
     # Database
-    database_url: str = "postgresql+asyncpg://tracker:tracker@localhost:5432/hundtracker"
+    database_url: str = "postgresql+asyncpg://tracker:tracker@localhost:5432/tracker"
 
     # MQTT
     mqtt_host: str = "mqtt.chickendinner.vip"

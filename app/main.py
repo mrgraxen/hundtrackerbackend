@@ -73,6 +73,13 @@ app.include_router(notifications.router)
 app.include_router(websocket.router)
 
 
+@app.get("/")
+async def root():
+    """Redirect to API docs."""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/docs", status_code=302)
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}

@@ -6,7 +6,7 @@ services:
   hundtracker-backend:
     image: ghcr.io/mrgraxen/hundtracker-backend:latest
     environment:
-      - DATABASE_URL=postgresql+asyncpg://tracker:tracker@hundtracker-db:5432/hundtracker
+      - DATABASE_URL=postgresql+asyncpg://tracker:tracker@hundtracker-db:5432/tracker
       - MQTT_HOST=mqtt.chickendinner.vip
       - MQTT_PORT=8883
       - MQTT_USERNAME=trackerbackend
@@ -22,7 +22,7 @@ services:
     environment:
       POSTGRES_USER: tracker
       POSTGRES_PASSWORD: tracker
-      POSTGRES_DB: hundtracker
+      POSTGRES_DB: tracker
     volumes:
       - hundtracker_db_data:/var/lib/postgresql/data
     healthcheck:
