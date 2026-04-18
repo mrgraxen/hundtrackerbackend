@@ -85,6 +85,14 @@ class HuntTeamMemberResponse(BaseModel):
     membership_status: str
 
 
+class HuntTeamDogItem(BaseModel):
+    """Dog linked to the hunt team (summary for team detail)."""
+
+    id: int
+    client_id: str
+    name: Optional[str] = None
+
+
 class HuntTeamDetailResponse(BaseModel):
     id: int
     name: str
@@ -94,6 +102,7 @@ class HuntTeamDetailResponse(BaseModel):
     join_policy: Optional[str] = None
     members: list[HuntTeamMemberResponse] = Field(default_factory=list)
     dog_count: Optional[int] = None
+    dogs: list[HuntTeamDogItem] = Field(default_factory=list)
 
 
 class HuntTeamSettingsResponse(BaseModel):
@@ -118,6 +127,12 @@ class JoinHuntTeamResponse(BaseModel):
 # ----- Dog -----
 class DogConnect(BaseModel):
     client_id: str
+
+
+class DogUpdate(BaseModel):
+    """Update dog display name (only the user who registered the dog)."""
+
+    name: Optional[str] = Field(default=None, max_length=100)
 
 
 class DogResponse(BaseModel):

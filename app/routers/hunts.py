@@ -71,11 +71,15 @@ async def list_hunts(
     team_id: int,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    limit: int = Query(5, ge=1, le=100, description="Max hunts to return, newest first"),
 ):
-    """List hunts for a hunt team."""
+    """List recent hunts for a hunt team (newest first). Default 5."""
     await require_active_member(db, team_id, user.id)
     result = await db.execute(
-        select(Hunt).where(Hunt.hunt_team_id == team_id).order_by(Hunt.started_at.desc())
+        select(Hunt)
+        .where(Hunt.hunt_team_id == team_id)
+        .order_by(Hunt.started_at.desc())
+        .limit(limit)
     )
     return list(result.scalars().all())
 

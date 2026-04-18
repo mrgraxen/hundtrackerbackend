@@ -23,6 +23,7 @@ from app.schemas import (
     DogResponse,
     HuntTeamCreate,
     HuntTeamDetailResponse,
+    HuntTeamDogItem,
     HuntTeamListItem,
     HuntTeamMemberResponse,
     HuntTeamResponse,
@@ -332,12 +333,16 @@ async def get_hunt_team(
         for m, dn, email in result.all()
     ]
 
-    dog_count_result = await db.execute(
-        select(func.count()).select_from(DogHuntTeam).where(
-            DogHuntTeam.hunt_team_id == team_id
-        )
+    dogs_result = await db.execute(
+        select(Dog.id, Dog.client_id, Dog.name)
+        .join(DogHuntTeam, DogHuntTeam.dog_id == Dog.id)
+        .where(DogHuntTeam.hunt_team_id == team_id)
+        .order_by(Dog.client_id)
     )
-    dog_count = dog_count_result.scalar() or 0
+    dogs = [
+        HuntTeamDogItem(id=did, client_id=cid, name=n)
+        for did, cid, n in dogs_result.all()
+    ]
 
     return HuntTeamDetailResponse(
         id=team.id,
@@ -347,7 +352,8 @@ async def get_hunt_team(
         created_at=team.created_at,
         join_policy=_policy_value(team),
         members=members,
-        dog_count=dog_count,
+        dog_count=len(dogs),
+        dogs=dogs,
     )
 
 
@@ -487,9 +493,11 @@ async def connect_dog(
     result = await db.execute(select(Dog).where(Dog.client_id == data.client_id))
     dog = result.scalar_one_or_none()
     if not dog:
-        dog = Dog(client_id=data.client_id)
+        dog = Dog(client_id=data.client_id, added_by_user_id=user.id)
         db.add(dog)
         await db.flush()
+    elif dog.added_by_user_id is None:
+        dog.added_by_user_id = user.id
 
     existing = await db.execute(
         select(DogHuntTeam).where(
