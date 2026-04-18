@@ -30,6 +30,11 @@ from app.schemas import (
 router = APIRouter(prefix="/hunts", tags=["hunts"])
 
 
+def _source_type_str(source_type) -> str:
+    """ORM may return SourceType enum or plain string from DB."""
+    return getattr(source_type, "value", source_type)
+
+
 async def _require_participant(db: AsyncSession, hunt_id: int, user_id: int) -> None:
     result = await db.execute(
         select(HuntParticipant).where(
@@ -316,14 +321,14 @@ async def get_positions(
     seen = set()
     unique = []
     for p in positions:
-        key = (p.source_type.value, p.source_id)
+        key = (_source_type_str(p.source_type), p.source_id)
         if key not in seen:
             seen.add(key)
             unique.append(p)
 
     return [
         PositionResponse(
-            source_type=p.source_type.value,
+            source_type=_source_type_str(p.source_type),
             source_id=p.source_id,
             lat=p.lat,
             lon=p.lon,
