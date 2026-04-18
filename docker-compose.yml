@@ -9,8 +9,8 @@ services:
     ports:
       - "8000:8000"
     environment:
-      # Dev only: browser UI at /debug/mqtt — never enable in production
-      - ENABLE_MQTT_DEBUG_PAGE=${ENABLE_MQTT_DEBUG_PAGE:-false}
+      # Dev only: /debug/mqtt — set ENABLE_MQTT_DEBUG_PAGE=false before production
+      - ENABLE_MQTT_DEBUG_PAGE=${ENABLE_MQTT_DEBUG_PAGE:-true}
       - DATABASE_URL=postgresql+asyncpg://tracker:tracker@db:5432/tracker
       - MQTT_HOST=${MQTT_HOST:-mqtt.chickendinner.vip}
       - MQTT_PORT=${MQTT_PORT:-8883}

@@ -4,8 +4,8 @@ services:
   hundtracker:
     image: ${HUNDTRACKER_IMAGE}
     environment:
-      # Dev only: /debug/mqtt — keep false in production
-      - ENABLE_MQTT_DEBUG_PAGE=${ENABLE_MQTT_DEBUG_PAGE:-false}
+      # Dev only: /debug/mqtt — set false before production
+      - ENABLE_MQTT_DEBUG_PAGE=${ENABLE_MQTT_DEBUG_PAGE:-true}
       - DATABASE_URL=postgresql+asyncpg://tracker:${HUNDTRACKER_DB_PASSWORD}@hundtracker-db:5432/tracker
       - MQTT_HOST=${MQTT_HOST}
       - MQTT_PORT=${MQTT_PORT}

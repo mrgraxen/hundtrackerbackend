@@ -23,8 +23,8 @@ class Settings(BaseSettings):
     # Position retention (hours to keep historical positions)
     position_retention_hours: int = 24
 
-    # Dev only: exposes /debug/mqtt (no auth) — disable in production
-    enable_mqtt_debug_page: bool = False
+    # Dev only: exposes /debug/mqtt (no auth). Default true for now — set false before production.
+    enable_mqtt_debug_page: bool = True
 
     class Config:
         env_file = ".env"
