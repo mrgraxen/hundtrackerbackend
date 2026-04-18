@@ -26,12 +26,14 @@ logger = logging.getLogger(__name__)
 POSITION_SUBSCRIBE_PATTERNS: tuple[str, ...] = ("position/in/+", "/position/in/+")
 CHAT_TOPIC_PREFIX = "/huntteam/"
 
-# Match .../position/in/{client_id} or position/in/{client_id} (with optional leading /)
+# Match .../position/in/{client_id} or position/in/{client_id} (leading/trailing slashes normalized)
 _POSITION_TOPIC_CLIENT = re.compile(r"(?:^|/)position/in/([^/]+)$")
 
 
 def _client_id_from_position_topic(topic_str: str) -> str | None:
-    m = _POSITION_TOPIC_CLIENT.search(topic_str)
+    # Some publishers use a trailing slash: /position/in/dog01/ — breaks "$" unless we strip.
+    t = topic_str.strip().rstrip("/")
+    m = _POSITION_TOPIC_CLIENT.search(t)
     return m.group(1) if m else None
 
 
