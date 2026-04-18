@@ -206,8 +206,8 @@ async def run_mqtt_listener(
 
                 async for message in client.messages:
                     try:
-                        if not message.topic.matches(f"{POSITION_TOPIC_PREFIX}+"):
-                            continue
+                        # Broker already filters by our subscription; do not re-filter with
+                        # topic.matches() — it can drop valid messages depending on aiomqtt version.
                         topic_str = str(getattr(message.topic, "value", message.topic))
                         client_id = topic_str.rstrip("/").split("/")[-1]
                         payload = json.loads(message.payload.decode())
@@ -228,6 +228,24 @@ async def run_mqtt_listener(
                         )
                     except Exception as e:
                         logger.exception("Error processing position: %s", e)
+                        topic_str = ""
+                        try:
+                            topic_str = str(
+                                getattr(message.topic, "value", message.topic)
+                            )
+                        except Exception:
+                            pass
+                        maybe_append_mqtt_debug(
+                            {
+                                "phase": "mqtt_message_handler_error",
+                                "client_id": topic_str.rstrip("/").split("/")[-1]
+                                if topic_str
+                                else "",
+                                "topic": topic_str,
+                                "error": repr(e),
+                                "detail": {},
+                            }
+                        )
         except asyncio.CancelledError:
             logger.info("MQTT listener cancelled")
             break
