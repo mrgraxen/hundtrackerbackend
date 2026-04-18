@@ -6,6 +6,7 @@ Publishes to: /huntteam/{team_id}/chat (chat messages from API)
 import asyncio
 import json
 import logging
+import re
 import ssl
 from datetime import datetime
 from typing import Callable
@@ -24,6 +25,14 @@ logger = logging.getLogger(__name__)
 # Dog position topics — subscribe to both; brokers/clients may use either string.
 POSITION_SUBSCRIBE_PATTERNS: tuple[str, ...] = ("position/in/+", "/position/in/+")
 CHAT_TOPIC_PREFIX = "/huntteam/"
+
+# Match .../position/in/{client_id} or position/in/{client_id} (with optional leading /)
+_POSITION_TOPIC_CLIENT = re.compile(r"(?:^|/)position/in/([^/]+)$")
+
+
+def _client_id_from_position_topic(topic_str: str) -> str | None:
+    m = _POSITION_TOPIC_CLIENT.search(topic_str)
+    return m.group(1) if m else None
 
 
 async def _process_dog_position(
@@ -186,18 +195,26 @@ async def run_mqtt_listener(
                 password=settings.mqtt_password,
                 tls_context=ctx,
             ) as client:
-                for pat in POSITION_SUBSCRIBE_PATTERNS:
+                if settings.mqtt_subscribe_catchall:
+                    patterns = ("#",)
+                    logger.warning(
+                        "MQTT catch-all subscription enabled (#) — high volume; disable MQTT_SUBSCRIBE_CATCHALL after testing"
+                    )
+                else:
+                    patterns = POSITION_SUBSCRIBE_PATTERNS
+                for pat in patterns:
                     await client.subscribe(pat)
                     logger.info("MQTT subscribed to %s", pat)
                 maybe_append_mqtt_debug(
                     {
                         "phase": "mqtt_listener_ready",
                         "client_id": "",
-                        "topic": ",".join(POSITION_SUBSCRIBE_PATTERNS),
+                        "topic": ",".join(patterns),
                         "detail": {
                             "broker": settings.mqtt_host,
                             "port": settings.mqtt_port,
-                            "subscribe_patterns": list(POSITION_SUBSCRIBE_PATTERNS),
+                            "subscribe_patterns": list(patterns),
+                            "catchall": settings.mqtt_subscribe_catchall,
                             "username": settings.mqtt_username,
                             "password_set": bool(settings.mqtt_password),
                         },
@@ -206,11 +223,34 @@ async def run_mqtt_listener(
 
                 async for message in client.messages:
                     try:
-                        # Broker already filters by our subscription; do not re-filter with
-                        # topic.matches() — it can drop valid messages depending on aiomqtt version.
                         topic_str = str(getattr(message.topic, "value", message.topic))
-                        client_id = topic_str.rstrip("/").split("/")[-1]
-                        payload = json.loads(message.payload.decode())
+                        raw = message.payload
+                        preview = ""
+                        try:
+                            preview = raw.decode()[:1200]
+                        except Exception:
+                            preview = f"<non-utf8 binary, {len(raw)} bytes>"
+
+                        if settings.mqtt_subscribe_catchall:
+                            maybe_append_mqtt_debug(
+                                {
+                                    "phase": "mqtt_catchall",
+                                    "client_id": "",
+                                    "topic": topic_str,
+                                    "detail": {
+                                        "payload_preview": preview,
+                                        "will_process_as_position": bool(
+                                            _client_id_from_position_topic(topic_str)
+                                        ),
+                                    },
+                                }
+                            )
+
+                        client_id = _client_id_from_position_topic(topic_str)
+                        if client_id is None:
+                            continue
+
+                        payload = json.loads(raw.decode())
                         await _process_dog_position(client_id, payload, topic_str)
                         if on_position:
                             on_position(client_id, payload)

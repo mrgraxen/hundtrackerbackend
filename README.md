@@ -68,6 +68,8 @@ docker-compose up -d
 
 ## MQTT
 
+**Troubleshooting:** Set `MQTT_SUBSCRIBE_CATCHALL=true` temporarily to subscribe to `#` and log every message on `/debug/mqtt` (noisy; disable after testing).
+
 ### Dog Positions (subscribe)
 
 - **Topic**: `position/in/{clientid}` or `/position/in/{clientid}` — leading `/` is a **different** topic string; backend subscribes to **both** patterns.

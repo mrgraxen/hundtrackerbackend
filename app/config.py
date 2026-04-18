@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     mqtt_port: int = 8883
     mqtt_username: str = "trackerbackend"
     mqtt_password: str = ""
+    # Dev only: subscribe to MQTT "#" to verify broker traffic (noisy; turn off after testing)
+    mqtt_subscribe_catchall: bool = False
 
     # JWT
     jwt_secret: str = "change-me-in-production"
