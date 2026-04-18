@@ -1,6 +1,6 @@
 """Hunt team endpoints - create, join, list, dogs."""
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, func
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user
@@ -9,6 +9,8 @@ from app.membership import get_membership, require_active_member
 from app.models import (
     Dog,
     DogHuntTeam,
+    Hunt,
+    HuntParticipant,
     HuntTeam,
     HuntTeamMember,
     JoinPolicy,
@@ -321,6 +323,47 @@ async def get_hunt_team(
         members=members,
         dog_count=dog_count,
     )
+
+
+@router.post("/{team_id}/leave")
+async def leave_hunt_team(
+    team_id: int,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Leave a hunt team (active or pending). Removes participation in this team's hunts."""
+    result = await db.execute(select(HuntTeam).where(HuntTeam.id == team_id))
+    team = result.scalar_one_or_none()
+    if not team:
+        raise HTTPException(status_code=404, detail="Hunt team not found")
+
+    membership = await get_membership(db, team_id, user.id)
+    if not membership:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Not a member of this hunt team",
+        )
+    if membership.role == MemberRole.OWNER:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Team owner cannot leave the team",
+        )
+
+    hunt_ids_result = await db.execute(
+        select(Hunt.id).where(Hunt.hunt_team_id == team_id)
+    )
+    hunt_ids = [r[0] for r in hunt_ids_result.all()]
+    if hunt_ids:
+        await db.execute(
+            delete(HuntParticipant).where(
+                HuntParticipant.user_id == user.id,
+                HuntParticipant.hunt_id.in_(hunt_ids),
+            )
+        )
+
+    await db.delete(membership)
+    await db.commit()
+    return {"message": "Left hunt team"}
 
 
 @router.delete("/{team_id}/members/{user_id}")
