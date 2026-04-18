@@ -48,11 +48,13 @@ class HuntTeamResponse(BaseModel):
 
 
 class HuntTeamListItem(BaseModel):
-    """My teams: full row for active members; pending users only get id, name, status."""
+    """My teams: active members get full metadata; pending users get id, name, status, and counts."""
 
     id: int
     name: str
     membership_status: str
+    member_count: int
+    dog_count: int
     created_by_user_id: Optional[int] = None
     created_at: Optional[datetime] = None
     join_policy: Optional[str] = None

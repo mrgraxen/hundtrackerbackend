@@ -90,15 +90,39 @@ async def list_my_hunt_teams(
         .where(HuntTeamMember.user_id == user.id)
     )
     rows = result.all()
+    team_ids = [t.id for t, _ in rows]
+    member_counts: dict[int, int] = {}
+    dog_counts: dict[int, int] = {}
+    if team_ids:
+        mc = await db.execute(
+            select(HuntTeamMember.hunt_team_id, func.count())
+            .where(
+                HuntTeamMember.hunt_team_id.in_(team_ids),
+                HuntTeamMember.membership_status == MembershipStatus.ACTIVE,
+            )
+            .group_by(HuntTeamMember.hunt_team_id)
+        )
+        member_counts = {tid: int(c) for tid, c in mc.all()}
+        dc = await db.execute(
+            select(DogHuntTeam.hunt_team_id, func.count())
+            .where(DogHuntTeam.hunt_team_id.in_(team_ids))
+            .group_by(DogHuntTeam.hunt_team_id)
+        )
+        dog_counts = {tid: int(c) for tid, c in dc.all()}
+
     items: list[HuntTeamListItem] = []
     for team, ms in rows:
         st = getattr(ms, "value", ms)
+        mcnt = member_counts.get(team.id, 0)
+        dcnt = dog_counts.get(team.id, 0)
         if st == MembershipStatus.PENDING.value:
             items.append(
                 HuntTeamListItem(
                     id=team.id,
                     name=team.name,
                     membership_status=MembershipStatus.PENDING.value,
+                    member_count=mcnt,
+                    dog_count=dcnt,
                 )
             )
         else:
@@ -107,6 +131,8 @@ async def list_my_hunt_teams(
                     id=team.id,
                     name=team.name,
                     membership_status=MembershipStatus.ACTIVE.value,
+                    member_count=mcnt,
+                    dog_count=dcnt,
                     created_by_user_id=team.created_by_user_id,
                     created_at=team.created_at,
                     join_policy=_policy_value(team),
