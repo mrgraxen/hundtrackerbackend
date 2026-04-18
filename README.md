@@ -68,7 +68,7 @@ docker-compose up -d
 
 ## MQTT
 
-**Troubleshooting:** Set `MQTT_SUBSCRIBE_CATCHALL=true` temporarily to subscribe to `#` and log every message on `/debug/mqtt` (noisy; disable after testing).
+**Troubleshooting:** `MQTT_SUBSCRIBE_CATCHALL` defaults to **true** for now (subscribe to `#`, log on `/debug/mqtt`). Set **`false`** before production.
 
 ### Dog Positions (subscribe)
 
