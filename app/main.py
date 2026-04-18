@@ -20,19 +20,8 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup: run migrations, start MQTT listener. Shutdown: cancel MQTT."""
+    """Startup: MQTT listener. DB migrations run in Docker via docker-entrypoint.sh; locally run: alembic upgrade head"""
     logger.info("Starting Hundtracker backend")
-    # Run migrations (run before app: alembic upgrade head)
-    import subprocess
-    try:
-        subprocess.run(
-            ["alembic", "upgrade", "head"],
-            cwd=".",
-            check=True,
-            capture_output=True,
-        )
-    except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        logger.warning("Migration skipped or failed: %s (run: alembic upgrade head)", e)
 
     mqtt_task = asyncio.create_task(run_mqtt_listener())
     cleanup_task = asyncio.create_task(run_cleanup_loop())
