@@ -1,7 +1,7 @@
-Topics:
-/position/in/$clientid
+Topics (no leading slash — must match backend subscription):
+position/in/$clientid
 so for example ClientID: dog1 will send information on
-/position/in/dog1
+position/in/dog1
 
 Example data:
 When esp32 has gpsfix example:

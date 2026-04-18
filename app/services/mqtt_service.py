@@ -1,6 +1,6 @@
 """MQTT service - subscribes to dog positions, publishes chat.
 
-Subscribes to: /position/in/+ (all dog positions per mqtt examples)
+Subscribes to: position/in/+ (no leading slash — matches typical ESP publish path)
 Publishes to: /huntteam/{team_id}/chat (chat messages from API)
 """
 import asyncio
@@ -21,8 +21,8 @@ from app.models import Dog, DogHuntTeam, Hunt, HuntStatus, Position, SourceType
 
 logger = logging.getLogger(__name__)
 
-# Topic patterns (from mqtt examples)
-POSITION_TOPIC_PREFIX = "/position/in/"
+# Topic patterns — must match firmware (many devices use "position/in/{id}" without a leading "/")
+POSITION_TOPIC_PREFIX = "position/in/"
 CHAT_TOPIC_PREFIX = "/huntteam/"
 
 
