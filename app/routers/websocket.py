@@ -8,7 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import oauth2_scheme
 from app.config import get_settings
 from app.database import AsyncSessionLocal
-from app.models import Hunt, HuntParticipant, HuntTeamMember
+from app.membership import require_active_member_ws
+from app.models import Hunt
 from app.websocket_manager import manager
 
 logger = logging.getLogger(__name__)
@@ -49,13 +50,8 @@ async def hunt_live(
             await websocket.close(code=4004)
             return
 
-        member = await db.execute(
-            select(HuntTeamMember).where(
-                HuntTeamMember.hunt_team_id == hunt.hunt_team_id,
-                HuntTeamMember.user_id == user_id,
-            )
-        )
-        if not member.scalar_one_or_none():
+        ok = await require_active_member_ws(db, hunt.hunt_team_id, user_id)
+        if not ok:
             await websocket.close(code=4003)
             return
 

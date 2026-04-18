@@ -2,16 +2,18 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from app.auth import get_current_user
 from app.database import get_db
+from app.membership import get_membership, require_active_member
 from app.models import (
     Dog,
     DogHuntTeam,
     HuntTeam,
     HuntTeamMember,
+    JoinPolicy,
     MemberRole,
+    MembershipStatus,
     User,
 )
 from app.schemas import (
@@ -19,26 +21,35 @@ from app.schemas import (
     DogResponse,
     HuntTeamCreate,
     HuntTeamDetailResponse,
+    HuntTeamListItem,
     HuntTeamMemberResponse,
     HuntTeamResponse,
     HuntTeamSearchResult,
+    HuntTeamSettingsResponse,
+    HuntTeamSettingsUpdate,
+    JoinHuntTeamResponse,
+    PendingMemberResponse,
 )
 
 router = APIRouter(prefix="/hunt-teams", tags=["hunt-teams"])
 
 
-async def _require_member(db: AsyncSession, hunt_team_id: int, user_id: int) -> HuntTeamMember:
-    result = await db.execute(
-        select(HuntTeamMember).where(
-            HuntTeamMember.hunt_team_id == hunt_team_id,
-            HuntTeamMember.user_id == user_id,
-        )
-    )
-    m = result.scalar_one_or_none()
-    if not m:
+def _policy_value(team: HuntTeam) -> str:
+    p = team.join_policy
+    return getattr(p, "value", p)
+
+
+def _status_value(m: HuntTeamMember) -> str:
+    s = m.membership_status
+    return getattr(s, "value", s)
+
+
+async def _require_owner(db: AsyncSession, team_id: int, user_id: int) -> HuntTeamMember:
+    m = await require_active_member(db, team_id, user_id)
+    if m.role != MemberRole.OWNER:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not a member of this hunt team",
+            detail="Only the team owner can perform this action",
         )
     return m
 
@@ -57,6 +68,7 @@ async def create_hunt_team(
         hunt_team_id=team.id,
         user_id=user.id,
         role=MemberRole.OWNER,
+        membership_status=MembershipStatus.ACTIVE,
     )
     db.add(member)
     await db.commit()
@@ -64,18 +76,41 @@ async def create_hunt_team(
     return team
 
 
-@router.get("", response_model=list[HuntTeamResponse])
+@router.get("", response_model=list[HuntTeamListItem])
 async def list_my_hunt_teams(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """List hunt teams the current user is a member of."""
+    """List hunt teams the current user has a membership row for (active or pending)."""
     result = await db.execute(
-        select(HuntTeam)
-        .join(HuntTeamMember)
+        select(HuntTeam, HuntTeamMember.membership_status)
+        .join(HuntTeamMember, HuntTeamMember.hunt_team_id == HuntTeam.id)
         .where(HuntTeamMember.user_id == user.id)
     )
-    return list(result.scalars().all())
+    rows = result.all()
+    items: list[HuntTeamListItem] = []
+    for team, ms in rows:
+        st = getattr(ms, "value", ms)
+        if st == MembershipStatus.PENDING.value:
+            items.append(
+                HuntTeamListItem(
+                    id=team.id,
+                    name=team.name,
+                    membership_status=MembershipStatus.PENDING.value,
+                )
+            )
+        else:
+            items.append(
+                HuntTeamListItem(
+                    id=team.id,
+                    name=team.name,
+                    membership_status=MembershipStatus.ACTIVE.value,
+                    created_by_user_id=team.created_by_user_id,
+                    created_at=team.created_at,
+                    join_policy=_policy_value(team),
+                )
+            )
+    return items
 
 
 @router.get("/search", response_model=list[HuntTeamSearchResult])
@@ -84,7 +119,7 @@ async def search_hunt_teams(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Search hunt teams by name. Returns all matching teams; is_member is true if current user is in the team."""
+    """Search hunt teams by name."""
     if not q or not q.strip():
         return []
     term = f"%{q.strip()}%"
@@ -92,26 +127,133 @@ async def search_hunt_teams(
         select(HuntTeam).where(HuntTeam.name.ilike(term)).order_by(HuntTeam.name)
     )
     teams = result.scalars().all()
-    # Which of these is the user a member of?
-    my_team_ids = set()
+    status_by_team: dict[int, str] = {}
     if teams:
         member_result = await db.execute(
-            select(HuntTeamMember.hunt_team_id).where(
+            select(HuntTeamMember.hunt_team_id, HuntTeamMember.membership_status).where(
                 HuntTeamMember.user_id == user.id,
                 HuntTeamMember.hunt_team_id.in_(t.id for t in teams),
             )
         )
-        my_team_ids = {r[0] for r in member_result.all()}
-    return [
-        HuntTeamSearchResult(
-            id=t.id,
-            name=t.name,
-            created_by_user_id=t.created_by_user_id,
-            created_at=t.created_at,
-            is_member=t.id in my_team_ids,
+        for tid, ms in member_result.all():
+            status_by_team[tid] = getattr(ms, "value", ms)
+    out: list[HuntTeamSearchResult] = []
+    for t in teams:
+        st = status_by_team.get(t.id)
+        is_member = st == MembershipStatus.ACTIVE.value
+        membership_pending = st == MembershipStatus.PENDING.value
+        if membership_pending:
+            out.append(
+                HuntTeamSearchResult(
+                    id=t.id,
+                    name=t.name,
+                    is_member=False,
+                    membership_pending=True,
+                )
+            )
+        else:
+            out.append(
+                HuntTeamSearchResult(
+                    id=t.id,
+                    name=t.name,
+                    created_by_user_id=t.created_by_user_id,
+                    created_at=t.created_at,
+                    is_member=is_member,
+                    membership_pending=False,
+                )
+            )
+    return out
+
+
+@router.get("/{team_id}/settings", response_model=HuntTeamSettingsResponse)
+async def get_hunt_team_settings(
+    team_id: int,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Current join policy (active members only)."""
+    result = await db.execute(select(HuntTeam).where(HuntTeam.id == team_id))
+    team = result.scalar_one_or_none()
+    if not team:
+        raise HTTPException(status_code=404, detail="Hunt team not found")
+    await require_active_member(db, team_id, user.id)
+    return HuntTeamSettingsResponse(join_policy=_policy_value(team))
+
+
+@router.patch("/{team_id}/settings", response_model=HuntTeamSettingsResponse)
+async def update_hunt_team_settings(
+    team_id: int,
+    data: HuntTeamSettingsUpdate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update join policy (team owner only)."""
+    result = await db.execute(select(HuntTeam).where(HuntTeam.id == team_id))
+    team = result.scalar_one_or_none()
+    if not team:
+        raise HTTPException(status_code=404, detail="Hunt team not found")
+    await _require_owner(db, team_id, user.id)
+    team.join_policy = JoinPolicy(data.join_policy)
+    await db.commit()
+    await db.refresh(team)
+    return HuntTeamSettingsResponse(join_policy=_policy_value(team))
+
+
+@router.get("/{team_id}/pending-members", response_model=list[PendingMemberResponse])
+async def list_pending_members(
+    team_id: int,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Users waiting for approval (team owner only)."""
+    result = await db.execute(select(HuntTeam).where(HuntTeam.id == team_id))
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Hunt team not found")
+    await _require_owner(db, team_id, user.id)
+
+    q = await db.execute(
+        select(HuntTeamMember, User.display_name, User.email)
+        .join(User, User.id == HuntTeamMember.user_id)
+        .where(
+            HuntTeamMember.hunt_team_id == team_id,
+            HuntTeamMember.membership_status == MembershipStatus.PENDING,
         )
-        for t in teams
+        .order_by(HuntTeamMember.joined_at)
+    )
+    return [
+        PendingMemberResponse(
+            user_id=m.user_id,
+            display_name=dn or email,
+            requested_at=m.joined_at,
+        )
+        for m, dn, email in q.all()
     ]
+
+
+@router.post("/{team_id}/members/{member_user_id}/approve")
+async def approve_pending_member(
+    team_id: int,
+    member_user_id: int,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Approve a pending membership (team owner only)."""
+    result = await db.execute(select(HuntTeam).where(HuntTeam.id == team_id))
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Hunt team not found")
+    await _require_owner(db, team_id, user.id)
+
+    target = await get_membership(db, team_id, member_user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="Member not found")
+    if _status_value(target) != MembershipStatus.PENDING.value:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User is not pending approval",
+        )
+    target.membership_status = MembershipStatus.ACTIVE
+    await db.commit()
+    return {"message": "Membership approved"}
 
 
 @router.get("/{team_id}", response_model=HuntTeamDetailResponse)
@@ -120,29 +262,46 @@ async def get_hunt_team(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get hunt team details with members and dog count."""
+    """Get hunt team details. Pending members only receive id and name."""
     result = await db.execute(
         select(HuntTeam).where(HuntTeam.id == team_id)
     )
     team = result.scalar_one_or_none()
     if not team:
         raise HTTPException(status_code=404, detail="Hunt team not found")
-    await _require_member(db, team_id, user.id)
+
+    membership = await get_membership(db, team_id, user.id)
+    if not membership:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not a member of this hunt team",
+        )
+
+    if _status_value(membership) == MembershipStatus.PENDING.value:
+        return HuntTeamDetailResponse(
+            id=team.id,
+            name=team.name,
+            membership_status=MembershipStatus.PENDING.value,
+        )
 
     result = await db.execute(
-        select(HuntTeamMember, User.display_name)
+        select(HuntTeamMember, User.display_name, User.email)
         .join(User, User.id == HuntTeamMember.user_id)
-        .where(HuntTeamMember.hunt_team_id == team_id)
+        .where(
+            HuntTeamMember.hunt_team_id == team_id,
+            HuntTeamMember.membership_status == MembershipStatus.ACTIVE,
+        )
+        .order_by(HuntTeamMember.joined_at)
     )
     members = [
         HuntTeamMemberResponse(
             user_id=m.user_id,
-            display_name=dn or m.user.email,
-            # m.role is now stored as a plain string in the DB
+            display_name=dn or email,
             role=getattr(m.role, "value", m.role),
             joined_at=m.joined_at,
+            membership_status=_status_value(m),
         )
-        for m, dn in result.all()
+        for m, dn, email in result.all()
     ]
 
     dog_count_result = await db.execute(
@@ -155,8 +314,10 @@ async def get_hunt_team(
     return HuntTeamDetailResponse(
         id=team.id,
         name=team.name,
+        membership_status=MembershipStatus.ACTIVE.value,
         created_by_user_id=team.created_by_user_id,
         created_at=team.created_at,
+        join_policy=_policy_value(team),
         members=members,
         dog_count=dog_count,
     )
@@ -169,13 +330,8 @@ async def remove_member(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Remove a member from the hunt team. Only the team owner (admin) can remove members."""
-    membership = await _require_member(db, team_id, user.id)
-    if membership.role != MemberRole.OWNER:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the team owner can remove members",
-        )
+    """Remove a member or reject a pending request. Only the team owner."""
+    await _require_owner(db, team_id, user.id)
     target = await db.execute(
         select(HuntTeamMember).where(
             HuntTeamMember.hunt_team_id == team_id,
@@ -195,35 +351,58 @@ async def remove_member(
     return {"message": "Member removed"}
 
 
-@router.post("/{team_id}/join")
+@router.post("/{team_id}/join", response_model=JoinHuntTeamResponse)
 async def join_hunt_team(
     team_id: int,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Join an existing hunt team (if open). Requires invite code in future."""
+    """Join a hunt team: immediate member if open, otherwise pending until owner approves."""
     result = await db.execute(select(HuntTeam).where(HuntTeam.id == team_id))
     team = result.scalar_one_or_none()
     if not team:
         raise HTTPException(status_code=404, detail="Hunt team not found")
 
-    existing = await db.execute(
-        select(HuntTeamMember).where(
-            HuntTeamMember.hunt_team_id == team_id,
-            HuntTeamMember.user_id == user.id,
+    existing = await get_membership(db, team_id, user.id)
+    if existing:
+        st = _status_value(existing)
+        if st == MembershipStatus.PENDING.value:
+            return JoinHuntTeamResponse(
+                message="Membership request pending",
+                membership_status=MembershipStatus.PENDING.value,
+            )
+        return JoinHuntTeamResponse(
+            message="Already a member",
+            membership_status=MembershipStatus.ACTIVE.value,
         )
-    )
-    if existing.scalar_one_or_none():
-        return {"message": "Already a member"}
+
+    policy = _policy_value(team)
+    if policy == JoinPolicy.APPROVAL_REQUIRED.value:
+        member = HuntTeamMember(
+            hunt_team_id=team_id,
+            user_id=user.id,
+            role=MemberRole.MEMBER,
+            membership_status=MembershipStatus.PENDING,
+        )
+        db.add(member)
+        await db.commit()
+        return JoinHuntTeamResponse(
+            message="Request sent; waiting for team owner approval",
+            membership_status=MembershipStatus.PENDING.value,
+        )
 
     member = HuntTeamMember(
         hunt_team_id=team_id,
         user_id=user.id,
         role=MemberRole.MEMBER,
+        membership_status=MembershipStatus.ACTIVE,
     )
     db.add(member)
     await db.commit()
-    return {"message": "Joined hunt team"}
+    return JoinHuntTeamResponse(
+        message="Joined hunt team",
+        membership_status=MembershipStatus.ACTIVE.value,
+    )
 
 
 @router.post("/{team_id}/dogs", response_model=DogResponse)
@@ -234,7 +413,7 @@ async def connect_dog(
     db: AsyncSession = Depends(get_db),
 ):
     """Connect a dog (by MQTT client_id) to the hunt team."""
-    await _require_member(db, team_id, user.id)
+    await require_active_member(db, team_id, user.id)
 
     result = await db.execute(select(Dog).where(Dog.client_id == data.client_id))
     dog = result.scalar_one_or_none()

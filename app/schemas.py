@@ -1,7 +1,7 @@
 """Pydantic schemas for API request/response."""
 from datetime import datetime
-from typing import Optional
-from pydantic import BaseModel, EmailStr, constr
+from typing import Literal, Optional
+from pydantic import BaseModel, EmailStr, constr, Field
 
 
 # ----- Auth -----
@@ -41,18 +41,35 @@ class HuntTeamResponse(BaseModel):
     name: str
     created_by_user_id: int
     created_at: datetime
+    join_policy: str
 
     class Config:
         from_attributes = True
 
 
-class HuntTeamSearchResult(BaseModel):
-    """Team search hit with membership flag."""
+class HuntTeamListItem(BaseModel):
+    """My teams: full row for active members; pending users only get id, name, status."""
+
     id: int
     name: str
-    created_by_user_id: int
-    created_at: datetime
+    membership_status: str
+    created_by_user_id: Optional[int] = None
+    created_at: Optional[datetime] = None
+    join_policy: Optional[str] = None
+
+
+class HuntTeamSearchResult(BaseModel):
+    """Team search hit with membership flag.
+
+    For pending membership, only id/name are set (no other team metadata).
+    """
+
+    id: int
+    name: str
+    created_by_user_id: Optional[int] = None
+    created_at: Optional[datetime] = None
     is_member: bool
+    membership_pending: bool = False
 
     class Config:
         from_attributes = True
@@ -63,11 +80,37 @@ class HuntTeamMemberResponse(BaseModel):
     display_name: Optional[str] = None
     role: str
     joined_at: datetime
+    membership_status: str
 
 
-class HuntTeamDetailResponse(HuntTeamResponse):
-    members: list[HuntTeamMemberResponse]
-    dog_count: int
+class HuntTeamDetailResponse(BaseModel):
+    id: int
+    name: str
+    membership_status: str
+    created_by_user_id: Optional[int] = None
+    created_at: Optional[datetime] = None
+    join_policy: Optional[str] = None
+    members: list[HuntTeamMemberResponse] = Field(default_factory=list)
+    dog_count: Optional[int] = None
+
+
+class HuntTeamSettingsResponse(BaseModel):
+    join_policy: str
+
+
+class HuntTeamSettingsUpdate(BaseModel):
+    join_policy: Literal["open", "approval_required"]
+
+
+class PendingMemberResponse(BaseModel):
+    user_id: int
+    display_name: Optional[str] = None
+    requested_at: datetime
+
+
+class JoinHuntTeamResponse(BaseModel):
+    message: str
+    membership_status: str
 
 
 # ----- Dog -----

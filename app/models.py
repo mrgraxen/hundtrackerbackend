@@ -30,6 +30,20 @@ class MemberRole(str, enum.Enum):
     MEMBER = "member"
 
 
+class JoinPolicy(str, enum.Enum):
+    """Who may join a hunt team without owner approval."""
+
+    OPEN = "open"
+    APPROVAL_REQUIRED = "approval_required"
+
+
+class MembershipStatus(str, enum.Enum):
+    """Membership row state (pending join requests vs full member)."""
+
+    PENDING = "pending"
+    ACTIVE = "active"
+
+
 class HuntStatus(str, enum.Enum):
     """Hunt session status."""
 
@@ -68,6 +82,11 @@ class HuntTeam(Base):
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     created_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    join_policy: Mapped[JoinPolicy] = mapped_column(
+        String(20),
+        default=JoinPolicy.OPEN,
+        nullable=False,
+    )
 
     members: Mapped[list["HuntTeamMember"]] = relationship(
         "HuntTeamMember", back_populates="hunt_team"
@@ -98,6 +117,11 @@ class HuntTeamMember(Base):
     )
     role: Mapped[MemberRole] = mapped_column(
         String(20), default=MemberRole.MEMBER, nullable=False
+    )
+    membership_status: Mapped[MembershipStatus] = mapped_column(
+        String(20),
+        default=MembershipStatus.ACTIVE,
+        nullable=False,
     )
     joined_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 

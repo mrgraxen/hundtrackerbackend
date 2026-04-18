@@ -1,30 +1,16 @@
 """Chat endpoints - send, history."""
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user
-from app.models import Hunt, HuntStatus
 from app.database import get_db
-from app.models import ChatMessage, HuntTeamMember, User
+from app.membership import require_active_member
+from app.models import ChatMessage, Hunt, HuntStatus, User
 from app.schemas import ChatMessageCreate, ChatMessageResponse
 from app.services.mqtt_service import publish_chat
 
 router = APIRouter(prefix="/hunt-teams", tags=["chat"])
-
-
-async def _require_team_member(db: AsyncSession, team_id: int, user_id: int) -> None:
-    result = await db.execute(
-        select(HuntTeamMember).where(
-            HuntTeamMember.hunt_team_id == team_id,
-            HuntTeamMember.user_id == user_id,
-        )
-    )
-    if not result.scalar_one_or_none():
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not a member of this hunt team",
-        )
 
 
 @router.post("/{team_id}/chat", response_model=ChatMessageResponse)
@@ -35,7 +21,7 @@ async def send_chat(
     db: AsyncSession = Depends(get_db),
 ):
     """Send chat message. Stored in DB, published to MQTT for real-time."""
-    await _require_team_member(db, team_id, user.id)
+    await require_active_member(db, team_id, user.id)
 
     msg = ChatMessage(
         hunt_team_id=team_id,
@@ -94,7 +80,7 @@ async def get_chat_history(
     before_id: int | None = Query(None, description="Cursor: messages before this ID"),
 ):
     """Get chat history - available when offline. Paginated."""
-    await _require_team_member(db, team_id, user.id)
+    await require_active_member(db, team_id, user.id)
 
     q = (
         select(ChatMessage, User.display_name, User.email)

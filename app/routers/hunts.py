@@ -8,14 +8,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user
 from app.database import get_db
+from app.membership import require_active_member
 from app.models import (
     Dog,
     DogHuntTeam,
     Hunt,
     HuntParticipant,
     HuntStatus,
-    HuntTeam,
-    HuntTeamMember,
     Position,
     SourceType,
     User,
@@ -29,20 +28,6 @@ from app.schemas import (
 )
 
 router = APIRouter(prefix="/hunts", tags=["hunts"])
-
-
-async def _require_team_member(db: AsyncSession, team_id: int, user_id: int) -> None:
-    result = await db.execute(
-        select(HuntTeamMember).where(
-            HuntTeamMember.hunt_team_id == team_id,
-            HuntTeamMember.user_id == user_id,
-        )
-    )
-    if not result.scalar_one_or_none():
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not a member of this hunt team",
-        )
 
 
 async def _require_participant(db: AsyncSession, hunt_id: int, user_id: int) -> None:
@@ -59,6 +44,23 @@ async def _require_participant(db: AsyncSession, hunt_id: int, user_id: int) -> 
         )
 
 
+async def _user_in_another_active_hunt(
+    db: AsyncSession, user_id: int, exclude_hunt_id: int
+) -> bool:
+    """True if user is already a participant in a different active hunt."""
+    result = await db.execute(
+        select(Hunt.id)
+        .join(HuntParticipant, HuntParticipant.hunt_id == Hunt.id)
+        .where(
+            HuntParticipant.user_id == user_id,
+            Hunt.status == HuntStatus.ACTIVE,
+            Hunt.id != exclude_hunt_id,
+        )
+        .limit(1)
+    )
+    return result.scalar_one_or_none() is not None
+
+
 @router.get("/teams/{team_id}", response_model=list[HuntResponse])
 async def list_hunts(
     team_id: int,
@@ -66,7 +68,7 @@ async def list_hunts(
     db: AsyncSession = Depends(get_db),
 ):
     """List hunts for a hunt team."""
-    await _require_team_member(db, team_id, user.id)
+    await require_active_member(db, team_id, user.id)
     result = await db.execute(
         select(Hunt).where(Hunt.hunt_team_id == team_id).order_by(Hunt.started_at.desc())
     )
@@ -80,7 +82,7 @@ async def start_hunt(
     db: AsyncSession = Depends(get_db),
 ):
     """Start a hunt for the hunt team."""
-    await _require_team_member(db, team_id, user.id)
+    await require_active_member(db, team_id, user.id)
 
     result = await db.execute(
         select(Hunt).where(
@@ -117,7 +119,7 @@ async def join_hunt(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Hunt is not active",
         )
-    await _require_team_member(db, hunt.hunt_team_id, user.id)
+    await require_active_member(db, hunt.hunt_team_id, user.id)
 
     existing = await db.execute(
         select(HuntParticipant).where(
@@ -128,10 +130,40 @@ async def join_hunt(
     if existing.scalar_one_or_none():
         return {"message": "Already joined"}
 
+    if await _user_in_another_active_hunt(db, user.id, hunt_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Already participating in another active hunt",
+        )
+
     p = HuntParticipant(hunt_id=hunt_id, user_id=user.id)
     db.add(p)
     await db.commit()
     return {"message": "Joined hunt"}
+
+
+@router.post("/{hunt_id}/leave")
+async def leave_hunt(
+    hunt_id: int,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Leave a hunt as a hunter — removes participation so you can join another active hunt."""
+    result = await db.execute(
+        select(HuntParticipant).where(
+            HuntParticipant.hunt_id == hunt_id,
+            HuntParticipant.user_id == user.id,
+        )
+    )
+    participant = result.scalar_one_or_none()
+    if not participant:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Not a participant in this hunt",
+        )
+    await db.delete(participant)
+    await db.commit()
+    return {"message": "Left hunt"}
 
 
 @router.post("/{hunt_id}/end")
@@ -145,7 +177,7 @@ async def end_hunt(
     hunt = result.scalar_one_or_none()
     if not hunt:
         raise HTTPException(status_code=404, detail="Hunt not found")
-    await _require_team_member(db, hunt.hunt_team_id, user.id)
+    await require_active_member(db, hunt.hunt_team_id, user.id)
     if hunt.status != HuntStatus.ACTIVE:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -168,7 +200,7 @@ async def get_hunt(
     hunt = result.scalar_one_or_none()
     if not hunt:
         raise HTTPException(status_code=404, detail="Hunt not found")
-    await _require_team_member(db, hunt.hunt_team_id, user.id)
+    await require_active_member(db, hunt.hunt_team_id, user.id)
 
     result = await db.execute(
         select(User).join(HuntParticipant).where(
@@ -248,7 +280,7 @@ async def get_positions(
     hunt = result.scalar_one_or_none()
     if not hunt:
         raise HTTPException(status_code=404, detail="Hunt not found")
-    await _require_team_member(db, hunt.hunt_team_id, user.id)
+    await require_active_member(db, hunt.hunt_team_id, user.id)
 
     cutoff = datetime.utcnow() - timedelta(minutes=since_minutes)
 
