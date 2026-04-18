@@ -1,6 +1,6 @@
 """MQTT service - subscribes to dog positions, publishes chat.
 
-Subscribes to: position/in/+ (no leading slash — matches typical ESP publish path)
+Subscribes to: position/in/+ AND /position/in/+ (with/without leading slash — MQTT treats them as different topics)
 Publishes to: /huntteam/{team_id}/chat (chat messages from API)
 """
 import asyncio
@@ -21,8 +21,8 @@ from app.models import Dog, DogHuntTeam, Hunt, HuntStatus, Position, SourceType
 
 logger = logging.getLogger(__name__)
 
-# Topic patterns — must match firmware (many devices use "position/in/{id}" without a leading "/")
-POSITION_TOPIC_PREFIX = "position/in/"
+# Dog position topics — subscribe to both; brokers/clients may use either string.
+POSITION_SUBSCRIBE_PATTERNS: tuple[str, ...] = ("position/in/+", "/position/in/+")
 CHAT_TOPIC_PREFIX = "/huntteam/"
 
 
@@ -186,18 +186,18 @@ async def run_mqtt_listener(
                 password=settings.mqtt_password,
                 tls_context=ctx,
             ) as client:
-                topic = f"{POSITION_TOPIC_PREFIX}+"
-                await client.subscribe(topic)
-                logger.info("MQTT subscribed to %s", topic)
+                for pat in POSITION_SUBSCRIBE_PATTERNS:
+                    await client.subscribe(pat)
+                    logger.info("MQTT subscribed to %s", pat)
                 maybe_append_mqtt_debug(
                     {
                         "phase": "mqtt_listener_ready",
                         "client_id": "",
-                        "topic": topic,
+                        "topic": ",".join(POSITION_SUBSCRIBE_PATTERNS),
                         "detail": {
                             "broker": settings.mqtt_host,
                             "port": settings.mqtt_port,
-                            "subscribe_pattern": topic,
+                            "subscribe_patterns": list(POSITION_SUBSCRIBE_PATTERNS),
                             "username": settings.mqtt_username,
                             "password_set": bool(settings.mqtt_password),
                         },

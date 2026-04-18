@@ -1,7 +1,7 @@
-Topics (no leading slash — must match backend subscription):
-position/in/$clientid
-so for example ClientID: dog1 will send information on
-position/in/dog1
+Topics (backend subscribes to both forms):
+position/in/$clientid   OR   /position/in/$clientid
+so for example ClientID: dog1 may publish on
+position/in/dog1   or   /position/in/dog1
 
 Example data:
 When esp32 has gpsfix example:

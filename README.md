@@ -17,7 +17,7 @@ Backend for a hunter tracker app: hunt teams, dog positions (ESP32/MQTT), hunter
 
 - **FastAPI** – REST API + WebSocket
 - **PostgreSQL** – Persistent storage
-- **MQTT** – Dog positions (subscribe `position/in/+`), chat publish (`/huntteam/{id}/chat`)
+- **MQTT** – Dog positions (subscribe `position/in/+` and `/position/in/+`), chat publish (`/huntteam/{id}/chat`)
 - **Docker** – Backend + PostgreSQL in containers
 
 ## Requirements
@@ -70,7 +70,7 @@ docker-compose up -d
 
 ### Dog Positions (subscribe)
 
-- **Topic**: `position/in/{clientid}` (e.g. `position/in/dog01`) — no leading `/`; that is a different MQTT topic than `/position/in/...`
+- **Topic**: `position/in/{clientid}` or `/position/in/{clientid}` — leading `/` is a **different** topic string; backend subscribes to **both** patterns.
 - **Payload (with GPS fix)**:
   ```json
   {"client":"dog01","lat":59.329323,"lon":18.068581,"speed":0.0,"alt":12,"vsat":8,"accuracy":3.5,"time":"2025-03-01T15:22:10"}
