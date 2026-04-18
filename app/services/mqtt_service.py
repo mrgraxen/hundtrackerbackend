@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.database import AsyncSessionLocal
+from app.mqtt_debug_buffer import maybe_append_mqtt_debug
 from app.models import Dog, DogHuntTeam, Hunt, HuntStatus, Position, SourceType
 
 logger = logging.getLogger(__name__)
@@ -25,8 +26,21 @@ POSITION_TOPIC_PREFIX = "/position/in/"
 CHAT_TOPIC_PREFIX = "/huntteam/"
 
 
-async def _process_dog_position(client_id: str, payload: dict) -> None:
+async def _process_dog_position(
+    client_id: str, payload: dict, topic_str: str = ""
+) -> None:
     """Store dog position in DB and associate with active hunts."""
+    maybe_append_mqtt_debug(
+        {
+            "phase": "mqtt_received",
+            "client_id": client_id,
+            "topic": topic_str,
+            "detail": {
+                "payload_keys": list(payload.keys()),
+                "payload_preview": str(payload)[:800],
+            },
+        }
+    )
     async with AsyncSessionLocal() as session:
         try:
             # Ensure dog exists
@@ -50,6 +64,13 @@ async def _process_dog_position(client_id: str, payload: dict) -> None:
             )
             active_hunt_ids = [r[0] for r in hunt_result.all()]
             hunt_id = active_hunt_ids[0] if active_hunt_ids else None
+
+            team_rows = await session.execute(
+                select(DogHuntTeam.hunt_team_id)
+                .where(DogHuntTeam.dog_id == dog.id)
+                .order_by(DogHuntTeam.hunt_team_id)
+            )
+            dog_team_ids = [r[0] for r in team_rows.all()]
 
             # Parse payload (from mqtt examples)
             fix = payload.get("fix", True)
@@ -89,8 +110,11 @@ async def _process_dog_position(client_id: str, payload: dict) -> None:
                 )
             session.add(pos)
             await session.commit()
+            await session.refresh(pos)
             logger.debug("Stored position for dog %s", client_id)
 
+            ws_ok: list[int] = []
+            ws_err: str | None = None
             # Broadcast to WebSocket clients for active hunts
             if active_hunt_ids:
                 try:
@@ -108,11 +132,42 @@ async def _process_dog_position(client_id: str, payload: dict) -> None:
                     }
                     for hid in active_hunt_ids:
                         await manager.broadcast_position(hid, pos_dict)
+                        ws_ok.append(hid)
                 except Exception as e:
+                    ws_err = str(e)
                     logger.warning("WebSocket broadcast failed: %s", e)
+
+            maybe_append_mqtt_debug(
+                {
+                    "phase": "mqtt_processed",
+                    "client_id": client_id,
+                    "topic": topic_str,
+                    "detail": {
+                        "dog_db_id": dog.id,
+                        "dog_linked_team_ids": dog_team_ids,
+                        "active_hunt_ids": active_hunt_ids,
+                        "position_id": pos.id,
+                        "position_hunt_id": hunt_id,
+                        "fix": pos.fix,
+                        "lat": pos.lat,
+                        "lon": pos.lon,
+                        "websocket_broadcast_hunt_ids": ws_ok,
+                        "websocket_error": ws_err,
+                    },
+                }
+            )
         except Exception as e:
             await session.rollback()
             logger.exception("Failed to store dog position: %s", e)
+            maybe_append_mqtt_debug(
+                {
+                    "phase": "mqtt_error",
+                    "client_id": client_id,
+                    "topic": topic_str,
+                    "error": repr(e),
+                    "detail": {},
+                }
+            )
 
 
 async def run_mqtt_listener(
@@ -142,11 +197,21 @@ async def run_mqtt_listener(
                         topic_str = str(getattr(message.topic, "value", message.topic))
                         client_id = topic_str.rstrip("/").split("/")[-1]
                         payload = json.loads(message.payload.decode())
-                        await _process_dog_position(client_id, payload)
+                        await _process_dog_position(client_id, payload, topic_str)
                         if on_position:
                             on_position(client_id, payload)
                     except json.JSONDecodeError as e:
                         logger.warning("Invalid JSON from %s: %s", message.topic, e)
+                        topic_str = str(getattr(message.topic, "value", message.topic))
+                        maybe_append_mqtt_debug(
+                            {
+                                "phase": "mqtt_json_error",
+                                "client_id": topic_str.rstrip("/").split("/")[-1],
+                                "topic": topic_str,
+                                "error": str(e),
+                                "detail": {},
+                            }
+                        )
                     except Exception as e:
                         logger.exception("Error processing position: %s", e)
         except asyncio.CancelledError:

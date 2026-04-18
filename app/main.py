@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.routers import auth, chat, dogs, hunt_teams, hunts, notifications, websocket
+from app.routers import auth, chat, debug_mqtt, dogs, hunt_teams, hunts, notifications, websocket
 from app.services.mqtt_service import run_mqtt_listener
 from app.tasks import run_cleanup_loop
 
@@ -55,6 +55,7 @@ app.add_middleware(
 )
 
 app.include_router(auth.router)
+app.include_router(debug_mqtt.router)
 app.include_router(dogs.router)
 app.include_router(hunt_teams.router)
 app.include_router(hunts.router)
