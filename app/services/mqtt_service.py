@@ -189,6 +189,20 @@ async def run_mqtt_listener(
                 topic = f"{POSITION_TOPIC_PREFIX}+"
                 await client.subscribe(topic)
                 logger.info("MQTT subscribed to %s", topic)
+                maybe_append_mqtt_debug(
+                    {
+                        "phase": "mqtt_listener_ready",
+                        "client_id": "",
+                        "topic": topic,
+                        "detail": {
+                            "broker": settings.mqtt_host,
+                            "port": settings.mqtt_port,
+                            "subscribe_pattern": topic,
+                            "username": settings.mqtt_username,
+                            "password_set": bool(settings.mqtt_password),
+                        },
+                    }
+                )
 
                 async for message in client.messages:
                     try:
@@ -219,6 +233,20 @@ async def run_mqtt_listener(
             break
         except Exception as e:
             logger.exception("MQTT connection error, reconnecting in 10s: %s", e)
+            maybe_append_mqtt_debug(
+                {
+                    "phase": "mqtt_listener_connect_error",
+                    "client_id": "",
+                    "topic": "",
+                    "error": repr(e),
+                    "detail": {
+                        "broker": settings.mqtt_host,
+                        "port": settings.mqtt_port,
+                        "username": settings.mqtt_username,
+                        "password_set": bool(settings.mqtt_password),
+                    },
+                }
+            )
             await asyncio.sleep(10)
 
 
