@@ -31,6 +31,12 @@ class UserResponse(BaseModel):
         from_attributes = True
 
 
+class TokenWithUser(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserResponse
+
+
 # ----- Hunt Team -----
 class HuntTeamCreate(BaseModel):
     name: str

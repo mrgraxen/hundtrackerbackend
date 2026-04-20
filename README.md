@@ -6,7 +6,7 @@ Backend for a hunter tracker app: hunt teams, dog positions (ESP32/MQTT), hunter
 
 ## Features
 
-- **Hunter profiles** – Register, login (JWT)
+- **Hunter profiles** – Register; login returns JWT plus user profile (`id`, `display_name`, `created_at`)
 - **Hunt teams** – Create or join teams; hunters can belong to multiple teams
 - **Dogs** – Connect dogs (MQTT client_id) to hunt teams; positions from ESP32 via MQTT
 - **Hunts** – Start a hunt; hunters join and share positions; see map with hunters + dogs
@@ -46,7 +46,7 @@ docker-compose up -d
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | POST | `/auth/register` | Create hunter profile |
-| POST | `/auth/login` | Login, get JWT |
+| POST | `/auth/login` | Login; JWT + user profile (no extra call) |
 | GET | `/hunt-teams` | List my hunt teams |
 | GET | `/hunt-teams/search?q=...` | Search teams by name |
 | POST | `/hunt-teams` | Create hunt team |
@@ -65,6 +65,23 @@ docker-compose up -d
 | GET | `/hunt-teams/{id}/chat` | Chat history (paginated) |
 | POST | `/hunts/{id}/end` | End active hunt |
 | POST | `/notifications/register` | Register device for push |
+
+### Login response (`POST /auth/login`)
+
+Returns the access token and the authenticated user so the client can cache profile fields without decoding the JWT:
+
+```json
+{
+  "access_token": "...",
+  "token_type": "bearer",
+  "user": {
+    "id": 42,
+    "email": "hunter@example.com",
+    "display_name": "Erik",
+    "created_at": "2024-01-01T00:00:00"
+  }
+}
+```
 
 ## MQTT
 
@@ -92,7 +109,7 @@ docker-compose up -d
 
 ## Frontend Integration
 
-1. **Auth** – Store JWT; send as `Authorization: Bearer {token}`
+1. **Auth** – On login, store `access_token` and optional `user` from the response; send `Authorization: Bearer {token}` on later requests
 2. **Map** – Poll `GET /hunts/{id}/positions` or use WebSocket `/hunts/{id}/live?token=JWT` for real-time
 3. **Hunter position** – POST to `/hunts/{id}/position` (GPS from device)
 4. **Chat** – GET history, POST new messages; subscribe to MQTT or use WebSocket for real-time
